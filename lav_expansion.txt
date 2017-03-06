@@ -1,0 +1,57 @@
+#Prompt to specify input lav file and minimum score you're interested in.
+echo "This pipeline processes lav output from lastz alignments, compares alignment blocks, and returns"
+echo "the best alignment at each basepair for your target sequence."
+echo ""
+echo "Please enter lav file prefix (ex - for file 'foo.lav' type 'foo'): "
+read prefix
+echo ""
+echo "Please enter minimum seq identity score (ex - enter '80' for scores >=80% similarity in output)"
+echo "Entering a lower score with make the pipeline run slower:"
+read minscore
+
+#Create new folder for analysis and transfer lav file. 
+mkdir ${prefix}
+scp ${prefix}.lav ${prefix}
+cd ./${prefix}
+
+echo ""
+echo "Pipeline running..."
+
+#Convert lav file to a script that prints sequence identity at each basepair within blocks.
+sed 's/  e /split /g' ${prefix}.lav >&${prefix}_range1
+sed -i -n '/split/,$p' ${prefix}_range1
+sed 's/  l /select /g' ${prefix}_range1 >&${prefix}_range2
+awk -v minscore="$minscore" '$6 >= minscore' ${prefix}_range2 >&${prefix}_range3
+awk '{print "seq", $2, $4, "B", $6, "C"}' ${prefix}_range3 >&seq_script.txt
+sed -e 's/B /| awk {print $seq, "/g' < seq_script.txt >&seq_script1
+sed -e 's/ C/"} >> all_blocks/g' < seq_script1 >&seq_script_pipe.txt
+sed -i "s/{/'{/g" seq_script_pipe.txt
+sed -i "s/}/}'/g" seq_script_pipe.txt 
+
+#Run script to convert lav file to basepair resolution.
+bash seq_script_pipe.txt
+
+#Process output from seq_script_pipe.txt so all numbers per field are padded with same number of digits (necessary for correctly sorting)
+awk '{print $1}' all_blocks >&all_blocks1
+awk '{print $2}' all_blocks >&all_blocks2
+awk -F: '{ printf "%012i\n", $1 }' all_blocks1 >&all_blocks1pad
+awk -F: '{ printf "%03i\n", $1 }' all_blocks2 >&all_blocks2pad
+paste all_blocks1pad all_blocks2pad > all_blocks_padded
+
+#Sort all basepairs and scores in reverse order so highest score is listed for a given basepair is listed first, and print highest score per basepair
+sort -r all_blocks_padded >&all_blocks_sort
+awk '{print $2, $1}' all_blocks_sort >&all_blocks_flip
+uniq -f 1 all_blocks_flip >&all_blocks_uniq
+
+#Rearrange so that basepairs in order and generate output
+awk '{print $2, $1}' all_blocks_uniq >&all_blocks_top
+sort all_blocks_top >&${prefix}_expanded.txt
+
+#Clean-up folder
+rm all_blocks*
+rm *_range*
+rm seq_script.txt
+rm seq_script1
+rm seq_script_pipe.txt
+
+echo "Done!"

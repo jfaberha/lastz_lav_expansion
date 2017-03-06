@@ -1,0 +1,68 @@
+#Prompt to specify input files and parameters
+echo "This pipeline is designed to look for highly conserved genomic content between more distantly"
+echo "related species that may be indicative of Horizontal Gene Transfer (HGT)."
+echo ""
+echo "Use this pipeline with caution, as it is highly dependent on the species or strains chosen"
+echo "for initial alignments and preliminary empirical observations for sequence identity differences"
+echo "between these species or strains."
+echo ""
+echo "See the associated readme file for recommended use of this pipeline and important caveats."
+echo ""
+echo "Please enter filename for processed lav alignment file with expected HGT content (should be "
+echo "output from 'lav_expansion_pipe.txt'): "
+read hgtcheck
+echo ""
+echo "Please enter filename for processed lav alignment file for masking (should be output from "
+echo "'lav_expansion_pipe.txt'): "
+read hgtmask
+echo ""
+echo "Please enter minimum seq identity threshold for calling HGT content. Example - entering '95'"
+echo "will provide output that shows predicted HGT sequence intervals with >=95% sequence similarity"
+echo "in HGT alignment after masking:"
+read threshold
+echo ""
+echo "Please enter maximum allowed seq identity difference between HGT and non-HGT content."
+echo "Example - entering '10' will mask predicted HGT alignments only if masking alignment is within "
+echo "10% identity of HGT alignment. So if a certain locus in your HGT alignment file shows 98% sequence"
+echo "identity, that locus will be masked if it shows >=88% sequence identity in your masking alignment:"
+read diff
+echo ""
+echo "Finally, please enter the project name (output directory and files will be named accordingly):"
+read strain
+
+#Create new folder for analysis and transfer lav file. 
+mkdir ${strain}
+scp ${hgtcheck} ${strain}
+scp ${hgtmask} ${strain}
+cd ./${strain}
+
+echo ""
+echo "Pipeline running..."
+
+#Check to see that masking alignment sequence identity is within specified range of expected HGT alignment
+join -a 1 -e " 000" ${hgtcheck} ${hgtmask} >&${strain}_joined.txt
+awk '{print $1, $2, $3, "000"}' ${strain}_joined.txt >&${strain}_extra0.txt
+awk '{print $1, $2, $3, $2 - $3}' ${strain}_extra0.txt >&${strain}_masked.txt
+awk -v diff="$diff" '$6 <= diff' ${strain}_masked.txt >&${strain}_closehits.txt
+awk '{print $1, $3}' ${strain}_closehits.txt  >&${strain}_closehits_nonisland.txt
+
+#With filtered masking alignment, here we actually conduct the masking and check to see if predicted HGT alignment sequence identity is above specified threshold
+join -a 1 -e " 000" ${hgtcheck} ${strain}_closehits_nonisland.txt >&${strain}_joined2.txt
+awk '{print $1, $2, $3, "000"}' ${strain}_joined2.txt >&${strain}_extra0_2.txt
+awk '{print $1, $2, $3, $2 - $3}' ${strain}_extra0_2.txt >&${strain}_masked2.txt
+awk -v threshold="$threshold" '$4 >= threshold' ${strain}_masked2.txt >&${strain}_masked_final.txt
+awk '{print $1, $4}' ${strain}_masked_final.txt >&${strain}_masked_lav.txt
+
+#clean up directory
+rm ${strain}_closehits_nonisland.txt
+rm ${strain}_closehits.txt
+rm ${strain}_extra0_2.txt
+rm ${strain}_extra0.txt
+rm ${strain}_joined2.txt
+rm ${strain}_joined.txt
+rm ${strain}_masked2.txt
+rm ${strain}_masked_final.txt
+rm ${strain}_masked.txt
+
+
+echo "Done!"
