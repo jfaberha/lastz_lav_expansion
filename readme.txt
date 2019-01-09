@@ -46,7 +46,7 @@ Our bacterial strains were perfectly suited for this analysis due to their genet
 
 For any additional details on how the pipeline was originally implemented, please refer to the following paper.  If you use either pipeline in your published research, please cite this paper as well.
 
-Porter, S.S., Faber-Hammond, J., Montoya, A.P., Friesen, M.L. and Sackos, C., 2018. Dynamic genomic architecture of mutualistic cooperation in a wild population of Mesorhizobium. The ISME journal, p.1.
+Porter SS, Faber-Hammond J, Montoya AP, Friesen ML, Sackos C. Dynamic genomic architecture of mutualistic cooperation in a wild population of Mesorhizobium. The ISME journal. 2018 Sep 14:1.
 
 Getting Started
 ---------------
